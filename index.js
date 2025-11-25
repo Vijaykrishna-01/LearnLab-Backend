@@ -32,6 +32,12 @@ app.use(
     origin: true,
   })
 );
+
+
+
+// ✅ Handle preflight OPTIONS requests for all routes
+app.options('*', cors());
+
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.json());
 app.use(cookieParser());

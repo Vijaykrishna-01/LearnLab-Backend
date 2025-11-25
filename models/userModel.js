@@ -1,86 +1,176 @@
 const mongoose = require('mongoose');
 
-// Base User schema with the discriminatorKey
+
+// ============================================================================
+// BASE USER SCHEMA (Shared across all roles)
+// ============================================================================
 const userSchema = new mongoose.Schema({
+
     name: { type: String, required: true, trim: true },
-    email: { type: String, unique: true, required: true, trim: true, lowercase: true },
+
+    email: {
+        type: String,
+        required: true,
+        unique: true,
+        index: true,
+        trim: true,
+        lowercase: true
+    },
+
     password: { type: String, required: true, select: false },
+
+    // For refresh-token rotation
+    refreshToken: { type: String, select: false },
+
+    verified: { type: Boolean, default: false }, // email verification
+
     bio: { type: String, default: '' },
-    phone: { type: Number },
-    active: { type: Boolean, default: false },
-    role: { type: String, enum: ['student', 'instructor', 'admin'], required: true },
+
+    phone: { type: String, trim: true },
+
+    profilePicture: { type: String, default: '' },
+
     headline: { type: String },
-    profilePicture: { url: { type: String, default: '' } },
-}, { 
-    timestamps: true, 
-    discriminatorKey: 'role',
-    toJSON: { virtuals: true }, // Enable virtuals
-    toObject: { virtuals: true } // Enable virtuals
+
+    active: { type: Boolean, default: true },
+
+    // Discriminator used for multi-role separation
+    role: {
+        type: String,
+        enum: ["student", "instructor", "admin"],
+        required: true
+    },
+
+    socialLinks: {
+        facebook: String,
+        linkedin: String,
+        twitter: String,
+        github: String
+    }
+
+}, {
+    timestamps: true,
+    discriminatorKey: "role",
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
 });
 
-// Virtual field for joined date 
-userSchema.virtual('joined').get(function() { return this._id.getTimestamp(); });
 
-// Base User model
-const User = mongoose.model('User', userSchema);
+// Virtual: account creation date (nice for dashboards)
+userSchema.virtual("joined").get(function () {
+    return this._id.getTimestamp();
+});
 
-// Student schema and discriminator
+
+// Base model
+const User = mongoose.model("User", userSchema);
+
+
+
+// ============================================================================
+// STUDENT SCHEMA (Wishlist, Cart, Purchased Courses, Progress)
+// ============================================================================
 const studentSchema = new mongoose.Schema({
-    courses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
+
+    wishlist: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Course"
+    }],
+
+    cart: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Course"
+    }],
+
+    purchasedCourses: [{
+        course: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
+        purchasedAt: { type: Date, default: Date.now }
+    }],
+
+    courseProgress: [{
+        course: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
+        progress: { type: Number, default: 0 },  // % completed
+        lastViewed: { type: Date }
+    }]
+
 }, {
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
 });
 
-// Virtual field for course details in students
-studentSchema.virtual('courseDetails', {
-    ref: 'Course',
-    localField: 'courses',
-    foreignField: '_id',
+
+// Virtual: Populate course details in wishlist
+studentSchema.virtual("wishlistDetails", {
+    ref: "Course",
+    localField: "wishlist",
+    foreignField: "_id"
 });
 
-// Define the Student discriminator
-const Student = User.discriminator('student', studentSchema);
+// Virtual: Populate purchased course documents
+studentSchema.virtual("purchasedCourseDetails", {
+    ref: "Course",
+    localField: "purchasedCourses.course",
+    foreignField: "_id"
+});
 
-// Instructor schema and discriminator
+const Student = User.discriminator("student", studentSchema);
+
+
+
+// ============================================================================
+// INSTRUCTOR SCHEMA (Courses Created, Income, Students Taught)
+// ============================================================================
 const instructorSchema = new mongoose.Schema({
+
     expertise: { type: String },
+
     rating: { type: Number, default: 0 },
-    students: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User', match: { role: 'student' } }],
-    courses: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Course' }],
+
+    // Instructor courses (Course model holds enrolled students)
+    courses: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Course"
+    }],
+
+    // Total income earned from courses (cached or computed)
+    totalIncome: { type: Number, default: 0 },
+
+    // Total unique students taught (computed/updated occasionally)
+    studentsTaughtCount: { type: Number, default: 0 }
+
 }, {
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
 });
 
-// Virtual field for student details in instructors
-instructorSchema.virtual('studentDetails', {
-    ref: 'User',
-    localField: 'students',
-    foreignField: '_id',
-    justOne: false,
+
+// Virtual: populate full course details
+instructorSchema.virtual("courseDetails", {
+    ref: "Course",
+    localField: "courses",
+    foreignField: "_id"
 });
 
-// Virtual field for course details in instructors
-instructorSchema.virtual('courseDetails', {
-    ref: 'Course',
-    localField: 'courses',
-    foreignField: '_id',
-    justOne: false,
-});
+const Instructor = User.discriminator("instructor", instructorSchema);
 
-// Define the Instructor discriminator
-const Instructor = User.discriminator('instructor', instructorSchema);
 
-// Admin schema and discriminator
+
+// ============================================================================
+// ADMIN SCHEMA (No special fields needed)
+// ============================================================================
 const adminSchema = new mongoose.Schema({}, {
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
 });
 
-// Define the Admin discriminator
-const Admin = User.discriminator('admin', adminSchema);
+const Admin = User.discriminator("admin", adminSchema);
 
+
+
+
+// ============================================================================
+// EXPORT
+// ============================================================================
 module.exports = {
     User,
     Student,
