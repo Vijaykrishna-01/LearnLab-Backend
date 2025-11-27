@@ -46,7 +46,16 @@ const userSchema = new mongoose.Schema({
         linkedin: String,
         twitter: String,
         github: String
-    }
+    },
+     cart: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Course"
+    }],
+
+    wishlist: [{
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Course"
+    }],
 
 }, {
     timestamps: true,
