@@ -1,9 +1,10 @@
-const Course = require("../models/courseModel");
-const { cloudinary } = require("../config/cloudinaryConfig");
-const fs = require("fs");
+
+// const { cloudinary } = require("../config/cloudinaryConfig");
+// const fs = require("fs");
 const path = require("path");
 const { uploadCloudinary, deleteFromCloudinary } = require("../utils/uploadCloudinary");
-const { User } = require("../models/userModel");
+const Course = require("../models/courseModel");
+// const { User } = require("../models/userModel");
 
 const addNewCourse = async (req, res) => {
   try {
@@ -13,14 +14,20 @@ const addNewCourse = async (req, res) => {
           category,
           price,
           modules,
-          instructor
+          instructor,
+          promoVideo,
+          level,
+          language,
+          requirements,
+          whatYouWillLearn,
+          tags
       } = req.body;
 
       // Parse modules data if it's sent as a string
       const parsedModules = typeof modules === 'string' ? JSON.parse(modules) : modules;
 
       // Validate required fields
-      if (!title || !description || !category || !price || !parsedModules) {
+      if (!title || !description || !category || !price || !parsedModules || !instructor) {
           return res.status(400).json({
               success: false,
               message: "All required fields must be provided"
@@ -70,6 +77,11 @@ const addNewCourse = async (req, res) => {
           };
       });
 
+      // Calculate total duration of the course (in minutes)
+      const totalDuration = parsedModules.reduce((total, module) => {
+          return total + module.lessons.reduce((sum, lesson) => sum + parseInt(lesson.duration), 0);
+      }, 0);
+
       // Create new course
       const newCourse = new Course({
           title,
@@ -78,7 +90,14 @@ const addNewCourse = async (req, res) => {
           price: Number(price),
           instructor, // Assuming you have user info from auth middleware
           image: courseImage,
-          modules: processedModules
+          promoVideo,
+          level,
+          language,
+          requirements,
+          whatYouWillLearn,
+          tags,
+          modules: processedModules,
+          totalDuration
       });
 
       // Save the course
@@ -102,12 +121,14 @@ const addNewCourse = async (req, res) => {
   }
 };
 
+
 const getAllCourse = async (req, res) => {
   try {
     const courses = await Course.find(req.query)
       .populate('categoryDetails', 'name')
       .populate('instructorDetails', 'name email profileImage')
       .populate('studentDetails', 'name email profileImage')
+      .select('title description price image.url averageRating status isFree level language')
       .exec();
 
     res.status(200).json(courses);
@@ -116,61 +137,35 @@ const getAllCourse = async (req, res) => {
   }
 };
 
+
 // Get a single course by ID
 const getCourseById = async (req, res) => {
   try {
-    const courseById = await Course.findById(req.params.courseId).exec();
+    const { ids } = req.body; // Array of course IDs
 
-    if (!courseById) {
-      return res.status(404).json({ message: "Course not found" });
-    }
-    res.status(200).json(courseById);
-  } catch (error) {
-    res.status(500).json({ message: "Server error", error: error.message });
-  }
-};
-
-//Get CourseBy UserId
-const getCoursesByUserId = async (req, res) => {
-  const { userId } = req.params;
-
-  try {
-    // Fetch the user role from the database
-    const user = await User.findById(userId).select('role');
-
-    if (!user) {
-      return res.status(404).json({ message: "User not found." });
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'No course IDs provided' });
     }
 
-    const userRole = user.role; // Assuming the role field is stored as 'role'
-    let courses = [];
+    const courses = await Course.find({ '_id': { $in: ids } })
+      .populate('categoryDetails', 'name')
+      .populate('instructorDetails', 'name email')
+      .populate('studentDetails', 'name email')
+      .exec();
 
-    if (userRole === 'instructor') {
-      courses = await Course.find({ instructor: userId })
-        .populate('category', 'name')
-        .populate('instructor', 'name email')
-        .select('title description price image.url averageRating')
-        .exec();
-    } else if (userRole === 'student') {
-      courses = await Course.find({ students: userId })
-        .populate('category', 'name')
-        .populate('instructor', 'name email')
-        .select('title description price image.url averageRating')
-        .exec();
-    } else {
-      return res.status(403).json({ message: "Access denied. Invalid role." });
+    if (courses.length === 0) {
+      return res.status(404).json({ message: 'No courses found for the provided IDs' });
     }
 
-    // Return the fetched courses as an array
     res.status(200).json(courses);
   } catch (error) {
-    console.error("Error fetching courses by userId:", error);
-    res.status(500).json({ message: "Server error. Unable to fetch courses." });
+    console.error("Error fetching courses by IDs:", error);
+    res.status(500).json({ message: 'Error fetching courses', error: error.message });
   }
 };
 
 
-// Update an existing course by ID
+//Get CourseBy UserId
 const updateCourse = async (req, res) => {
   try {
       const courseId = req.params.courseId;
@@ -181,7 +176,14 @@ const updateCourse = async (req, res) => {
           price,
           modules,
           instructor,
-          students
+          students,
+          promoVideo,
+          level,
+          language,
+          requirements,
+          whatYouWillLearn,
+          tags,
+          status
       } = req.body;
 
       // Find existing course
@@ -193,27 +195,12 @@ const updateCourse = async (req, res) => {
           });
       }
 
-      if (students) {
-        const updatedCourse = await Course.findByIdAndUpdate(
-          courseId,
-          { $addToSet: { students: students } },  // Use $addToSet to avoid duplicates
-          { new: true }
-        );
-
-        return res.status(200).json({
-          success: true,
-          message: "Course students updated successfully",
-          course: updatedCourse
-        });
-      }
-
-      // Parse modules data it's sent as a string
+      // Parse modules data if it's sent as a string
       const parsedModules = typeof modules === 'string' ? JSON.parse(modules) : modules;
 
-      // Handle image uploads
+      // Handle image uploads (same logic as in addNewCourse)
       let uploadedImages = [];
       if (req.files && req.files.length > 0) {
-          // Delete existing images from Cloudinary if they exist
           if (existingCourse.image) {
               await deleteFromCloudinary(existingCourse.image.publicId);
           }
@@ -225,11 +212,9 @@ const updateCourse = async (req, res) => {
               });
           });
 
-          // Upload new images to Cloudinary
           const uploadPromises = req.files.map(async (file, index) => {
               const publicId = `courses/${Date.now()}-${index}`;
               const result = await uploadCloudinary(file.path, publicId);
-              
               return {
                   publicId: result.public_id,
                   url: result.secure_url
@@ -239,14 +224,12 @@ const updateCourse = async (req, res) => {
           uploadedImages = await Promise.all(uploadPromises);
       }
 
-      // Use the first image as course main image or keep existing
       const courseImage = uploadedImages[0] || existingCourse.image;
 
-      // Process modules and map remaining images to lessons
-      let imageIndex = 1; // Start from second image, as first is used for course
+      // Process modules and lessons as before
+      let imageIndex = 1;
       const processedModules = parsedModules.map(module => {
           const processedLessons = module.lessons.map(lesson => {
-              // Find existing lesson image or assign new one if available
               const existingLesson = existingCourse.modules
                   .find(m => m.moduleNumber === module.moduleNumber)
                   ?.lessons.find(l => l.title === lesson.title);
@@ -269,17 +252,28 @@ const updateCourse = async (req, res) => {
           };
       });
 
-      // Update course with new data
+      // Recalculate total duration
+      const totalDuration = parsedModules.reduce((total, module) => {
+          return total + module.lessons.reduce((sum, lesson) => sum + parseInt(lesson.duration), 0);
+      }, 0);
+
       const updatedCourse = await Course.findByIdAndUpdate(
           courseId,
           {
-              title: title || existingCourse.title,
-              description: description || existingCourse.description,
-              category: category || existingCourse.category,
-              price: price ? Number(price) : existingCourse.price,
-              instructor: instructor || existingCourse.instructor,
-              image: courseImage,
-              modules: processedModules
+              title,
+              description,
+              category,
+              price: Number(price),
+              instructor,
+              promoVideo,
+              level,
+              language,
+              requirements,
+              whatYouWillLearn,
+              tags,
+              modules: processedModules,
+              status: status || existingCourse.status,
+              totalDuration
           },
           { new: true }
       );
@@ -300,20 +294,16 @@ const updateCourse = async (req, res) => {
   }
 };
 
-
 // Delete a course by ID
 const deleteCourse = async (req, res) => {
   try {
-    // Find and delete the course
     const deletedCourse = await Course.findByIdAndDelete(req.params.courseId).exec();
 
     if (!deletedCourse) {
       return res.status(404).json({ message: "Course not found" });
     }
 
-    // Check if the course has an associated image
     if (deletedCourse.image && deletedCourse.image.publicId) {
-      // Attempt to delete the image from Cloudinary
       try {
         await deleteFromCloudinary(deletedCourse.image.publicId);
       } catch (error) {
@@ -326,11 +316,13 @@ const deleteCourse = async (req, res) => {
     res.status(500).json({ message: "Error deleting course", error: error.message });
   }
 };
+
+
+
 module.exports = {
   getAllCourse,
   getCourseById,
   addNewCourse,
   updateCourse,
   deleteCourse,
-  getCoursesByUserId
 };
