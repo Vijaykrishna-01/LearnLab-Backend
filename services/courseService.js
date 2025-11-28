@@ -135,8 +135,8 @@ class CourseService {
   // Get courses for cart (minimal data)
   async getCoursesForCart(ids) {
     return await Course.find({ '_id': { $in: ids } })
-      .populate('instructorDetails', 'name')
-      .select('title image.url price isFree slug')
+      .populate('instructorDetails', 'name profilePicture')
+      .select('title image.url price instructor isFree slug')
       .lean()
       .exec();
   }
