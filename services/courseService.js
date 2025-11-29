@@ -143,7 +143,7 @@ class CourseService {
 
   // Get courses for wishlist (minimal data)
   async getCoursesForWishlist(ids) {
-    return await Course.find({ '_id': { $in: ids }, status: 'published' })
+    return await Course.find({ '_id': { $in: ids }})
       .populate('instructorDetails', 'name profileImage')
       .select('title image.url price averageRating totalRatings enrollmentCount totalDuration modulesCount instructor slug isFree')
       .lean()

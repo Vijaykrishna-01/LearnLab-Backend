@@ -10,6 +10,7 @@ const userRoute = require("./routes/userRoute.js");
 const courseRoute = require("./routes/courseRoute.js");
 const reviewRoute = require("./routes/reviewRoute.js");
 const cartRoute = require("./routes/cartRoute.js");
+const wishlistRoute = require("./routes/wishlistRoute.js")
 const categoryRoute = require("./routes/categoryRoute.js");
 const AssignmentRoute = require("./routes/assignmentRoute.js");
 const StudyPlanRoute = require("./routes/studyPlanRoute.js");
@@ -47,6 +48,7 @@ app.use("/user", userRoute);
 app.use("/courses", courseRoute);
 app.use("/rating", reviewRoute);
 app.use("/cart", cartRoute);
+app.use("/wishlist", wishlistRoute)
 app.use("/category", categoryRoute);
 app.use("/assignment", AssignmentRoute);
 app.use("/studyPlan", StudyPlanRoute);

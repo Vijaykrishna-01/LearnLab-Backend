@@ -273,6 +273,7 @@ class CourseController {
 
   // Get courses for wishlist (minimal data)
   getCoursesForWishlist = asyncHandler(async (req, res) => {
+    console.log(req.body)
     const { ids } = req.body;
 
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
