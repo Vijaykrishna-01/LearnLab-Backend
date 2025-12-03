@@ -6,6 +6,8 @@ const { connectDB } = require("./config/database.js");
 const cookieParser = require("cookie-parser");
 const bodyParser = require('body-parser');
 
+
+
 const userRoute = require("./routes/userRoute.js");
 const courseRoute = require("./routes/courseRoute.js");
 const reviewRoute = require("./routes/reviewRoute.js");
@@ -19,6 +21,12 @@ const authRoute = require("./routes/authRoute.js");
 
 const app = express();
 const port = process.env.PORT || 4500; // Ensure default value if PORT is not set
+
+app.post(
+  "/api/payment/webhook",
+  express.raw({ type: "application/json" }),
+  require("./routes/stripeRoute.js")
+);
 
 // Connect to Database
 connectDB();
