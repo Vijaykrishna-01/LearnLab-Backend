@@ -26,7 +26,7 @@ class CourseService {
     
     return await Course.find(query)
       .populate('categoryDetails', 'name')
-      .populate('instructorDetails', 'name email profileImage')
+      .populate('instructorDetails', 'name email profilePicture')
       .select('title description price image.url averageRating status isFree level language enrollmentCount totalDuration slug')
       .sort({ createdAt: -1 })
       .lean()
@@ -35,21 +35,19 @@ class CourseService {
 
   // Get courses by array of IDs
   async getCoursesByIds(ids) {
-    return await Course.find({ '_id': { $in: ids } })
-      .populate('categoryDetails', 'name')
-      .populate('instructorDetails', 'name email profileImage')
-      .populate('studentDetails', 'name email profileImage')
-      .lean()
-      .exec();
-  }
+  return await Course.find({ '_id': { $in: ids } })
+    .populate('instructorDetails', 'name profilePicture')
+    .select('title image.url duration thumbnailImage instructor')
+    .exec();
+}
 
   // Get single course by ID
   async getCourseById(id) {
     return await Course.findById(id)
       .populate('categoryDetails', 'name description')
-      .populate('instructorDetails', 'name email profileImage bio')
-      .populate('studentDetails', 'name email profileImage')
-      .populate('reviews.userId', 'name profileImage')
+      .populate('instructorDetails', 'name email profilePicture bio')
+      .populate('studentDetails', 'name email profilePicture')
+      .populate('reviews.userId', 'name profilePicture')
       .exec();
   }
 
@@ -57,7 +55,7 @@ class CourseService {
   async getCoursePreviewById(id) {
     return await Course.findById(id)
       .populate('categoryDetails', 'name description')
-      .populate('instructorDetails', 'name email profileImage bio rating totalStudents')
+      .populate('instructorDetails', 'name email profilePicture bio rating totalStudents')
       .select('title description price image.url averageRating totalRatings enrollmentCount totalDuration level language requirements whatYouWillLearn tags promoVideo modules.title modules.duration modules.lessons.title modules.lessons.duration slug status createdAt')
       .exec();
   }
@@ -89,7 +87,7 @@ class CourseService {
     const [courses, total] = await Promise.all([
       Course.find(searchQuery)
         .populate('categoryDetails', 'name')
-        .populate('instructorDetails', 'name profileImage')
+        .populate('instructorDetails', 'name profilePicture')
         .select('title description price image.url averageRating totalRatings enrollmentCount totalDuration level language slug isFree')
         .sort(sortOptions)
         .skip(skip)
@@ -125,7 +123,7 @@ class CourseService {
     
     return await Course.find(query)
       .populate('categoryDetails', 'name')
-      .populate('instructorDetails', 'name profileImage')
+      .populate('instructorDetails', 'name profilePicture')
       .select('title description price image.url averageRating enrollmentCount totalDuration level language slug isFree')
       .sort({ createdAt: -1 })
       .lean()
@@ -144,7 +142,7 @@ class CourseService {
   // Get courses for wishlist (minimal data)
   async getCoursesForWishlist(ids) {
     return await Course.find({ '_id': { $in: ids }})
-      .populate('instructorDetails', 'name profileImage')
+      .populate('instructorDetails', 'name profilePicture')
       .select('title image.url price averageRating totalRatings enrollmentCount totalDuration modulesCount instructor slug isFree')
       .lean()
       .exec();
@@ -156,13 +154,13 @@ class CourseService {
   async getFullCourseById(id) {
     return await Course.findById(id)
       .populate('categoryDetails', 'name description')
-      .populate('instructorDetails', 'name email profileImage bio socialLinks')
+      .populate('instructorDetails', 'name email profilePicture bio socialLinks')
       .populate({
         path: 'modules.lessons',
         select: 'title duration videoUrl content resources order isPreview',
         options: { sort: { order: 1 } }
       })
-      .populate('reviews.userId', 'name profileImage')
+      .populate('reviews.userId', 'name profilePicture')
       .select('-__v')
       .exec();
   }
@@ -258,7 +256,7 @@ class CourseService {
       { new: true, runValidators: true }
     ).populate([
       { path: 'categoryDetails', select: 'name' },
-      { path: 'instructorDetails', select: 'name email profileImage' }
+      { path: 'instructorDetails', select: 'name email profilePicture' }
     ]);
     
     return course;

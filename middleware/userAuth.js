@@ -3,7 +3,6 @@ const jwt = require('jsonwebtoken');
 
 const userAuth = (req, res, next) => {
   try {
-    console.log(req)
     // Try to get token from cookie first, then fall back to Authorization header
     let token = req.cookies.accessToken;
     
