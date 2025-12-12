@@ -72,35 +72,100 @@ const getUserById = async (req, res) => {
 
 const registerUser = async (req, res) => {
     try {
+        console.log("Registration request:", req.body);
+        
         const { name, email, password, role } = req.body;
 
-        const exists =
-            (await Student.findOne({ email })) ||
-            (await Instructor.findOne({ email })) ||
-            (await Admin.findOne({ email }));
+        // Validate required fields
+        if (!name || !email || !password || !role) {
+            return res.status(400).json({ 
+                success: false,
+                message: "All fields are required" 
+            });
+        }
 
-        if (exists) return res.status(400).json({ message: "User already exists" });
+        // Validate role
+        const validRoles = ["student", "instructor", "admin"];
+        if (!validRoles.includes(role)) {
+            return res.status(400).json({ 
+                success: false,
+                message: "Invalid role",
+                validRoles 
+            });
+        }
 
-        const hashed = await bcrypt.hash(password, 10);
+        // Check if user already exists
+        const exists = await Student.findOne({ email }) || 
+                      await Instructor.findOne({ email }) || 
+                      await Admin.findOne({ email });
+        
+        if (exists) {
+            return res.status(400).json({ 
+                success: false,
+                message: "User with this email already exists" 
+            });
+        }
+
+        // Hash password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Create user based on role
+        const userData = {
+            name,
+            email: email.toLowerCase(),
+            password: hashedPassword,
+            role
+        };
 
         let user;
+        
+        if (role === "student") {
+            user = await Student.create(userData);
+        } else if (role === "instructor") {
+            user = await Instructor.create(userData);
+        } else if (role === "admin") {
+            user = await Admin.create(userData);
+        }
 
-        if (role === "student") user = await Student.create({ ...req.body, password: hashed });
-        else if (role === "instructor") user = await Instructor.create({ ...req.body, password: hashed });
-        else if (role === "admin") user = await Admin.create({ ...req.body, password: hashed });
-        else return res.status(400).json({ message: "Invalid role" });
-
-        const token = generateUserToken(email, role);
-
-        res.status(201).json({
-            message: `${role} registered successfully`,
-            user,
-            token,
-            success: true
+        // Return success WITHOUT token
+        return res.status(201).json({
+            success: true,
+            message: `${role} registered successfully!`,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                role: user.role,
+                verified: user.verified,
+                createdAt: user.createdAt
+            }
+            // NO TOKEN HERE
         });
 
     } catch (error) {
-        res.status(500).json({ message: "Error registering user", error: error.message });
+        console.error("Registration error:", error);
+        
+        // Handle specific errors
+        if (error.code === 11000) {
+            return res.status(400).json({ 
+                success: false,
+                message: "Email already exists" 
+            });
+        }
+        
+        if (error.name === 'ValidationError') {
+            return res.status(400).json({ 
+                success: false,
+                message: "Validation error",
+                error: error.message 
+            });
+        }
+        
+        return res.status(500).json({ 
+            success: false,
+            message: "Internal server error",
+            error: process.env.NODE_ENV === 'development' ? error.message : undefined
+        });
     }
 };
 

@@ -80,4 +80,11 @@ router.get(
   courseController.getSingleCourse
 );
 
+router.get(
+  "/instructor/:instructorId",
+  // authMiddleware, // Add authentication
+  courseController.getCoursesByInstructorId
+);
+
+
 module.exports = router;

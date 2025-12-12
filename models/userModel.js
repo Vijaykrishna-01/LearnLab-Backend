@@ -81,16 +81,6 @@ const User = mongoose.model("User", userSchema);
 // ============================================================================
 const studentSchema = new mongoose.Schema({
 
-    wishlist: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Course"
-    }],
-
-    cart: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "Course"
-    }],
-
     purchasedCourses: [{
         course: { type: mongoose.Schema.Types.ObjectId, ref: "Course" },
         purchasedAt: { type: Date, default: Date.now }

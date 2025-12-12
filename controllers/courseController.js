@@ -1,4 +1,6 @@
+const { default: mongoose } = require('mongoose');
 const asyncHandler = require('../middleware/asyncHandler'); // We'll create this
+const Course = require('../models/courseModel');
 const courseService = require('../services/courseService');
 const imageService = require('../services/imageService');
 const CourseUtils = require('../utils/courseUtils');
@@ -322,6 +324,39 @@ class CourseController {
       course
     });
   });
+
+  // Get all courses by instructor ID
+ 
+ getCoursesByInstructorId = asyncHandler(async (req, res) => {
+  const { instructorId } = req.params;
+
+  // Validate ObjectId
+  if (!mongoose.Types.ObjectId.isValid(instructorId)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid instructor ID format'
+    });
+  }
+
+  // Call service
+  const courses = await courseService.getCoursesByInstructorId(instructorId);
+
+  // No courses found
+  if (!courses || courses.length === 0) {
+    return res.status(404).json({
+      success: false,
+      message: 'No courses found for this instructor',
+      data: []
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    count: courses.length,
+    data: courses
+  });
+});
+
 
 }
 
