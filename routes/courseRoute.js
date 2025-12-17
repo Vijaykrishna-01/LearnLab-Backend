@@ -88,6 +88,7 @@ router.put(
   '/:courseId',
   // protect,
   // authorizeInstructor,
+  upload.array('images', 20), // Max 10 images (main + lessons)
   courseController.updateCourse
 );
 
