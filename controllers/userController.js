@@ -5,51 +5,87 @@ const { uploadCloudinary } = require('../utils/uploadCloudinary');
 
 
 const getAllUsers = async (req, res) => {
-    try {
-        const { role, page = 1, limit = 10, search = '', sortField = 'name', sortOrder = 'asc' } = req.query;
+  try {
+    const {
+      role,
+      page = 1,
+      limit = 10,
+      search = "",
+      sortField = "name",
+      sortOrder = "asc",
+    } = req.query;
 
-        const sort = { [sortField]: sortOrder === 'asc' ? 1 : -1 };
-        const query = role ? { role } : {};
+    const sort = { [sortField]: sortOrder === "asc" ? 1 : -1 };
 
-        if (search) {
-            query.$or = [
-                { name: { $regex: search, $options: "i" } },
-                { email: { $regex: search, $options: "i" } }
-            ];
-        }
+    const query = {};
+    if (role) query.role = role;
 
-        const skip = (page - 1) * limit;
-
-        let Model =
-            role === "student" ? Student :
-            role === "instructor" ? Instructor :
-            role === "admin" ? Admin :
-            User; // fallback
-
-        const users = await Model.find(query)
-            .select("-password -refreshToken")
-            .sort(sort)
-            .skip(skip)
-            .limit(parseInt(limit, 10))
-            .populate([
-                { path: "purchasedCourses", select: "-__v" },
-                { path: "wishlistDetails" },
-                { path: "purchasedCourseDetails" }
-            ]);
-
-        res.json({
-            users,
-            pagination: {
-                page,
-                limit,
-                total: users.length
-            }
-        });
-
-    } catch (error) {
-        res.status(500).json({ message: "Error fetching users", error: error.message });
+    if (search) {
+      query.$or = [
+        { name: { $regex: search, $options: "i" } },
+        { email: { $regex: search, $options: "i" } },
+      ];
     }
+
+    const skip = (page - 1) * limit;
+
+    let Model;
+    let populateOptions = [];
+
+    /* ================= ROLE-BASED MODEL & POPULATE ================= */
+
+    if (role === "student") {
+      Model = Student;
+      populateOptions = [
+        { path: "purchasedCourses", select: "-__v" },
+        { path: "wishlistDetails" },
+        { path: "purchasedCourseDetails" },
+      ];
+    } 
+    else if (role === "instructor") {
+      Model = Instructor;
+      populateOptions = [
+        {
+          path: "courses",
+          select: "title price category enrolledStudents",
+        },
+      ];
+    } 
+    else if (role === "admin") {
+      Model = Admin;
+    } 
+    else {
+      Model = User; // fallback
+    }
+
+    /* ================= QUERY ================= */
+
+    const users = await Model.find(query)
+      .select("-password -refreshToken")
+      .sort(sort)
+      .skip(skip)
+      .limit(parseInt(limit, 10))
+      .populate(populateOptions);
+
+    const total = await Model.countDocuments(query);
+
+    res.json({
+      users,
+      pagination: {
+        page: Number(page),
+        limit: Number(limit),
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    res.status(500).json({
+      message: "Error fetching users",
+      error: error.message,
+    });
+  }
 };
+
 
 
 const getUserById = async (req, res) => {
