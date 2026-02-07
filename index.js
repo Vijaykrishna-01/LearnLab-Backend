@@ -20,7 +20,7 @@ const stripeRoute = require('./routes/stripeRoute.js');
 const authRoute = require("./routes/authRoute.js");
 
 const app = express();
-const port = process.env.PORT || 4500; // Ensure default value if PORT is not set
+const port = process.env.PORT || 3000; // Ensure default value if PORT is not set
 
 app.post(
   "/api/payment/webhook",
