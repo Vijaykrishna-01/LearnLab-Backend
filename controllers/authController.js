@@ -5,19 +5,26 @@ const {
   generateRefreshToken,
   verifyToken,
 } = require("../utils/generateToken");
-const { path } = require("..");
+
+// Remove this line completely - it was causing a circular dependency warning
+// const { path } = require("..");
 
 const isProduction = process.env.NODE_ENV === "production";
 
-// Centralize cookie options to avoid this mistake repeating
-const isLocalhost = req.headers.origin && req.headers.origin.startsWith("http://localhost");
-const cookieOptions = (maxAge) => ({
-  httpOnly: true,
-  secure: isProduction && !isLocalhost, // allow insecure for localhost
-  sameSite: isProduction && !isLocalhost ? "none" : "lax",
-  path: "/",
-  maxAge,
-});
+// Centralized cookie options (now correctly receives req)
+const cookieOptions = (maxAge, req) => {
+  // Detect localhost from the request origin (works for both dev and "production run locally")
+  const isLocalhost =
+    req?.headers?.origin && req.headers.origin.startsWith("http://localhost");
+
+  return {
+    httpOnly: true,
+    secure: isProduction && !isLocalhost, // false on localhost even if NODE_ENV=production
+    sameSite: isProduction && !isLocalhost ? "none" : "lax",
+    path: "/",
+    maxAge,
+  };
+};
 
 const loginUser = async (req, res) => {
   try {
@@ -34,8 +41,8 @@ const loginUser = async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
-    res.cookie("accessToken", accessToken, cookieOptions(15 * 60 * 1000));
-    res.cookie("refreshToken", refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
+    res.cookie("accessToken", accessToken, cookieOptions(15 * 60 * 1000, req));
+    res.cookie("refreshToken", refreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000, req));
 
     return res.status(200).json({
       success: true,
@@ -61,9 +68,8 @@ const refreshToken = async (req, res) => {
     const newAccessToken = generateAccessToken(user);
     const newRefreshToken = generateRefreshToken(user);
 
-    // ✅ Fixed: was using sameSite: "strict" before
-    res.cookie("accessToken", newAccessToken, cookieOptions(15 * 60 * 1000));
-    res.cookie("refreshToken", newRefreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000));
+    res.cookie("accessToken", newAccessToken, cookieOptions(15 * 60 * 1000, req));
+    res.cookie("refreshToken", newRefreshToken, cookieOptions(7 * 24 * 60 * 60 * 1000, req));
 
     return res.status(200).json({ success: true });
   } catch (err) {
@@ -73,8 +79,10 @@ const refreshToken = async (req, res) => {
 
 const logout = (req, res) => {
   try {
-    res.clearCookie("accessToken", cookieOptions(0));   // reuse same options
-    res.clearCookie("refreshToken", cookieOptions(0));
+    // Pass req so the options exactly match the ones used when setting the cookies
+    res.clearCookie("accessToken", cookieOptions(0, req));
+    res.clearCookie("refreshToken", cookieOptions(0, req));
+
     return res.status(200).json({ success: true, message: "Logged out successfully" });
   } catch (err) {
     return res.status(500).json({ message: "Error logging out", error: err.message });
@@ -93,7 +101,6 @@ const verifyLogin = async (req, res) => {
       return res.status(200).json({ loggedIn: false, user: null });
     }
 
-    // Fetch user from DB
     const user = await User.findById(decoded.id);
     if (!user || !user.active) {
       return res.status(200).json({ loggedIn: false, user: null });
