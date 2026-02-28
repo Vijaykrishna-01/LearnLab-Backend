@@ -10,10 +10,11 @@ const { path } = require("..");
 const isProduction = process.env.NODE_ENV === "production";
 
 // Centralize cookie options to avoid this mistake repeating
+const isLocalhost = req.headers.origin && req.headers.origin.startsWith("http://localhost");
 const cookieOptions = (maxAge) => ({
   httpOnly: true,
-  secure: isProduction,
-  sameSite: isProduction ? "none" : "lax",
+  secure: isProduction && !isLocalhost, // allow insecure for localhost
+  sameSite: isProduction && !isLocalhost ? "none" : "lax",
   path: "/",
   maxAge,
 });
